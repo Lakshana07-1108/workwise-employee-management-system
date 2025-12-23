@@ -64,15 +64,19 @@ const DailyAttendanceView = () => {
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const today = new Date().toISOString().split('T')[0];
 
-  // Fetch team members managed by this manager
+  // Fetch team members managed by this manager or all managers for admin
   useEffect(() => {
-    fetch(`http://localhost:5000/workDay/employees/${user.employeeId}/team`)
+    const endpoint = user?.role === 'Admin' 
+      ? 'http://localhost:5000/workDay/employees/managers'
+      : `http://localhost:5000/workDay/employees/${user.employeeId}/team`;
+    
+    fetch(endpoint)
       .then(res => res.json())
       .then((data)=>{setTeamMembers(data);
-        console.log("user")
-        console.log(data);
-      });
-  }, [user.employeeId]);
+        console.log("Team members/managers:", data);
+      })
+      .catch(error => console.error("Error fetching team members:", error));
+  }, [user.employeeId, user?.role]);
 
   // Fetch today's shifts for team
   useEffect(() => {
@@ -118,14 +122,76 @@ const DailyAttendanceView = () => {
       const shifts = await shiftRes.json();
 
       // Fetch today's attendance for this employee
-      const attRes = await fetch(`http://localhost:5000/workDay/timeentries/employee/${member._id}/date/${today}`);
+      const attRes = await fetch(`http://localhost:5000/workDay/timeEntries/employee/${member._id}/date/${today}`);
       const attendance = await attRes.json();
      
       // Fetch approved leave request for this employee for today
       const leaveRes = await fetch(`http://localhost:5000/workDay/leaves/employee/${member._id}/date/${today}`);
       const leaves = await leaveRes.json();
       
-      // Determine status
+      // If there's attendance, show it regardless of shift status
+      if (attendance.length) {
+        // Calculate total hours if multiple attendance records
+        let totalHours = 0;
+        let clockIn: Date | null = null;
+        let clockOut: Date | null = null;
+
+        // Find the earliest clockIn in the attendance array
+        clockIn = attendance
+          .map((entry: any) => entry.clockIn)
+          .filter(Boolean)
+          .map((dt: string) => new Date(dt))
+          .sort((a, b) => a.getTime() - b.getTime())[0] || null;
+
+        clockOut = attendance[0].clockOut ? new Date(attendance[0].clockOut) : null;
+
+        attendance.forEach((entry: any) => {
+          if (entry.totalHours) totalHours += entry.totalHours;
+          if (entry.clockOut && (!clockOut || new Date(entry.clockOut) > clockOut)) clockOut = new Date(entry.clockOut);
+        });
+
+        // Check for late arrival if shift exists
+        let status = "Present";
+        let details = "";
+        if (shifts.length) {
+          const shift = shifts[0];
+          const scheduledStart = new Date(`${today}T${shift.startTime}`);
+          const actualClockIn = new Date(attendance[0].clockIn);
+          if (actualClockIn > scheduledStart) {
+            const lateMinutes = Math.round((actualClockIn.getTime() - scheduledStart.getTime()) / (1000 * 60));
+            status = "Late";
+            details = `Late by ${lateMinutes} min`;
+          }
+        }
+
+        return {
+          ...member,
+          status,
+          details,
+          department: member.department?.name || "",
+          clockIn: clockIn ? clockIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+          clockOut: clockOut ? clockOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
+          totalHours: Math.round(totalHours * 1000) / 1000,
+          location: attendance[0]?.location || "",
+          notes: attendance[0]?.notes || ""
+        };
+      }
+      
+      // No attendance - check other statuses
+      if (leaves.length) {
+        return {
+          ...member,
+          status: "On Leave",
+          details: leaves[0].reason,
+          department: member.department?.name || "",
+          clockIn: null,
+          clockOut: null,
+          totalHours: 0,
+          location: "",
+          notes: leaves[0].reason
+        };
+      }
+
       if (!shifts.length) {
         return {
           ...member,
@@ -140,77 +206,17 @@ const DailyAttendanceView = () => {
         };
       }
 
-      if (!attendance.length) {
-        if (leaves.length) {
-          return {
-            ...member,
-            status: "On Leave",
-            details: leaves[0].reason,
-            department: member.department?.name || "",
-            clockIn: null,
-            clockOut: null,
-            totalHours: 0,
-            location: "",
-            notes: leaves[0].reason
-          };
-        }
-        return {
-          ...member,
-          status: "Absent",
-          details: "",
-          department: member.department?.name || "",
-          clockIn: null,
-          clockOut: null,
-          totalHours: 0,
-          location: "",
-          notes: ""
-        };
-      }
-
-      // Check for late arrival
-      const shift = shifts[0];
-      const scheduledStart = new Date(`${today}T${shift.startTime}`);
-      const actualClockIn = new Date(attendance[0].clockIn);
-      let status = "Present";
-      let details = "";
-      if (actualClockIn > scheduledStart) {
-        const lateMinutes = Math.round((actualClockIn.getTime() - scheduledStart.getTime()) / (1000 * 60));
-        status = "Late";
-        details = `Late by ${lateMinutes} min`;
-      }
-
-      // Calculate total hours if multiple attendance records
-      let totalHours = 0;
-      let clockIn: Date | null = null;
-      let clockOut: Date | null = null;
-
-      if (attendance.length) {
-        // Sum all hours and get earliest clockIn/latest clockOut
-        // Find the earliest clockIn in the attendance array
-        clockIn = attendance
-          .map((entry: any) => entry.clockIn)
-          .filter(Boolean)
-          .map((dt: string) => new Date(dt))
-          .sort((a, b) => a.getTime() - b.getTime())[0] || null;
-
-        clockOut = attendance[0].clockOut ? new Date(attendance[0].clockOut) : null;
-
-        attendance.forEach((entry: any) => {
-          if (entry.totalHours) totalHours += entry.totalHours;
-          if (entry.clockOut && (!clockOut || new Date(entry.clockOut) > clockOut)) clockOut = new Date(entry.clockOut);
-        });
-      }
-
+      // Has shift but no attendance
       return {
         ...member,
-        status,
-        details,
+        status: "Absent",
+        details: "",
         department: member.department?.name || "",
-        clockIn: clockIn ? clockIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
-        clockOut: clockOut ? clockOut.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
-        totalHours: Math.round(totalHours * 1000) / 1000,
-        location: attendance[0]?.location || "",
-        notes: attendance[0]?.notes || ""
+        clockIn: null,
+        clockOut: null,
+        totalHours: 0,
+        location: "",
+        notes: ""
       };
     })
   ).then(statusArr => setTodayStatus(statusArr));
@@ -443,26 +449,12 @@ export const TeamAttendancePage = () => {
     <div className="space-y-8 animate-fade-in-up">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold text-black">
             Team Attendance Dashboard
           </h1>
           <p className="text-lg text-muted-foreground mt-2">
             Monitor and manage team attendance with real-time tracking and analytics
           </p>
-        </div>
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button variant="outline">
-            <Calendar className="h-4 w-4 mr-2" />
-            View Calendar
-          </Button>
-          <Button className="bg-gradient-to-r from-primary to-purple-600 shadow-lg">
-            <Activity className="h-4 w-4 mr-2" />
-            Live Monitor
-          </Button>
         </div>
       </div>
       <Tabs defaultValue="daily" className="w-full">

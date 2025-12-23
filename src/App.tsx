@@ -10,7 +10,6 @@ import { LandingPage } from './pages/LandingPage';
 import { WorkforceProductPage } from './pages/WorkforceProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
-import {EmployeeManagement} from './pages/EmployeeManagement';
 import { AttendancePage } from './pages/AttendancePage';
 import { LeaveRequestsPage } from './pages/LeaveRequestsPage';
 import ShiftsPage  from './pages/ShiftsPage';
@@ -109,7 +108,7 @@ export default function App() {
             
             {/* Employee routes */}
             <Route path="/dashboard/shifts" element={
-              <ProtectedRoute allowedRoles={['employee']}>
+              <ProtectedRoute allowedRoles={['employee', 'manager']}>
                 <DashboardLayout>
                   <ShiftsPage />
                 </DashboardLayout>
@@ -117,7 +116,7 @@ export default function App() {
             } />
             
             <Route path="/dashboard/my-goals" element={
-              <ProtectedRoute allowedRoles={['employee']}>
+              <ProtectedRoute allowedRoles={['employee', 'manager']}>
                 <DashboardLayout>
                   <MyGoalsPage />
                 </DashboardLayout>
@@ -125,7 +124,7 @@ export default function App() {
             } />
             
             <Route path="/dashboard/leave-requests" element={
-              <ProtectedRoute allowedRoles={['employee']}>
+              <ProtectedRoute allowedRoles={['employee', 'manager']}>
                 <DashboardLayout>
                   <LeaveRequestsPage />
                 </DashboardLayout>
@@ -133,7 +132,7 @@ export default function App() {
             } />
             
             <Route path="/dashboard/attendance" element={
-              <ProtectedRoute allowedRoles={['employee']}>
+              <ProtectedRoute allowedRoles={['employee', 'manager']}>
                 <DashboardLayout>
                   <AttendancePage />
                 </DashboardLayout>
@@ -141,7 +140,7 @@ export default function App() {
             } />
             
             <Route path="/dashboard/payslips" element={
-              <ProtectedRoute allowedRoles={['employee']}>
+              <ProtectedRoute allowedRoles={['employee', 'manager']}>
                 <DashboardLayout>
                   <PayslipsPage />
                 </DashboardLayout>
@@ -149,7 +148,7 @@ export default function App() {
             } />
             
             <Route path="/dashboard/shift-swaps" element={
-              <ProtectedRoute allowedRoles={['employee']}>
+              <ProtectedRoute allowedRoles={['employee', 'manager']}>
                 <DashboardLayout>
                   <ShiftSwapsPage />
                 </DashboardLayout>
@@ -157,14 +156,6 @@ export default function App() {
             } />
             
             {/* Manager/Admin routes */}
-            <Route path="/dashboard/employees" element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <DashboardLayout>
-                  <EmployeeManagement />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            
             <Route path="/dashboard/goals" element={
               <ProtectedRoute allowedRoles={['manager', 'admin']}>
                 <DashboardLayout>

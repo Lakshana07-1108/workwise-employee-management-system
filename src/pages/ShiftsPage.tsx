@@ -78,7 +78,7 @@ const ShiftsPage: React.FC = () => {
           let status: Shift["status"] = "upcoming";
           if (shift.isOpen) {
             status = "open";
-          } else if (shiftDate < new Date(now.setHours(0, 0, 0, 0))) {
+          } else if (now > end) {
             status = "completed";
           } else if (now >= start && now <= end) {
             status = "in-progress";

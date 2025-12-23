@@ -13,6 +13,7 @@ interface Employee {
   _id: string;
   firstName: string;
   lastName: string;
+  role?: string;
 }
 
 interface ApprovalRequest {
@@ -190,7 +191,6 @@ const ApprovalDetailDialog = ({ approval, onApprove, onReject }: { approval: App
 
 export const ApprovalsPage = () => {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
-  const [openShiftRequests, setOpenShiftRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -204,7 +204,19 @@ export const ApprovalsPage = () => {
           throw new Error('Failed to fetch approvals');
         }
         const data = await response.json();
-        const transformedData = data.map((item: any) => ({
+        
+        // Filter based on user role:
+        // - Managers see requests from their team (employees)
+        // - Admins see requests only from managers
+        let filteredData = data;
+        if (user?.role === 'Admin') {
+          // Admins only see leave requests from managers
+          filteredData = data.filter((item: any) => 
+            item.employeeId && item.employeeId.role === 'Manager'
+          );
+        }
+        
+        const transformedData = filteredData.map((item: any) => ({
           id: item._id,
           type: 'leave',
           employeeName: `${item.employeeId.firstName} ${item.employeeId.lastName}`,
@@ -229,26 +241,13 @@ export const ApprovalsPage = () => {
         setLoading(false);
       }
     };
-    const fetchOpenShiftRequests = async () => {
-      if (!user?.employeeId) return;
-      try {
-        const res = await fetch(`http://localhost:5000/workDay/shifts/requests/manager/${user.employeeId}`);
-        const data = await res.json();
-        console.log("Fetched open shift requests:", data);
-        setOpenShiftRequests(data);
-      } catch (err) {
-        console.error("Error fetching open shift requests:", err);
-      }
-    };
 
     fetchApprovals();
-    fetchOpenShiftRequests();
-    setLoading(false);
   }, [user]);
 
   const filteredApprovals = approvals.filter((approval) => {
     const statusMatch = filter === 'all' || approval.status === filter;
-    const typeMatch = typeFilter === 'all' || approval.type === typeFilter;
+    const typeMatch = typeFilter === 'all' || approval.details.leaveType.toLowerCase() === typeFilter;
     return statusMatch && typeMatch;
   });
 
@@ -341,37 +340,6 @@ const handleReject = async (id: string, notes: string) => {
   }
 };
 
-// Approve Open Shift
-  const handleApproveOpenShift = async (shiftId: string) => {
-    try {
-      const res = await fetch(`http://localhost:5000/workDay/shifts/request/approve/${shiftId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ managerId: user.employeeId }),
-      });
-      if (!res.ok) throw new Error("Failed to approve open shift");
-      // Optionally update UI
-      setOpenShiftRequests((prev) => prev.filter((shift) => shift._id !== shiftId));
-    } catch (err) {
-      console.error("Error approving open shift:", err);
-    }
-  };
-
-  // Reject Open Shift
-  const handleRejectOpenShift = async (shiftId: string) => {
-    try {
-      const res = await fetch(`http://localhost:5000/workDay/shifts/request/reject/${shiftId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ managerId: user.employeeId }),
-      });
-      if (!res.ok) throw new Error("Failed to reject open shift");
-      setOpenShiftRequests((prev) => prev.filter((shift) => shift._id !== shiftId));
-    } catch (err) {
-      console.error("Error rejecting open shift:", err);
-    }
-  };
-
   if (loading) {
     return <div>Loading approvals...</div>;
   }
@@ -454,7 +422,11 @@ const handleReject = async (id: string, notes: string) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="leave">Leave Requests</SelectItem>
+                  <SelectItem value="vacation">Vacation</SelectItem>
+                  <SelectItem value="sick">Sick Leave</SelectItem>
+                  <SelectItem value="personal">Personal Leave</SelectItem>
+                  <SelectItem value="maternity">Maternity Leave</SelectItem>
+                  <SelectItem value="bereavement">Bereavement Leave</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -542,44 +514,6 @@ const handleReject = async (id: string, notes: string) => {
           })
         )}
       </div>
-
-      {/* Open Shift Requests Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Open Shift Requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {openShiftRequests.length === 0 ? (
-            <div className="text-muted-foreground">No open shift requests pending approval.</div>
-          ) : (
-            openShiftRequests.map((shift) => (
-              <div key={shift._id} className="border-b py-3 flex justify-between items-center">
-                <div>
-                  <div>
-                    <strong>Employee:</strong> {shift.requestedBy?.firstName} {shift.requestedBy?.lastName}
-                  </div>
-                  <div>
-                    <strong>Date:</strong> {new Date(shift.date).toLocaleDateString()}
-                  </div>
-                  <div>
-                    <strong>Time:</strong> {new Date(shift.startTime).toLocaleTimeString()} - {new Date(shift.endTime).toLocaleTimeString()}
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <Button size="sm" onClick={() => handleApproveOpenShift(shift._id)}>
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Approve
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleRejectOpenShift(shift._id)}>
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Reject
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };

@@ -46,6 +46,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   const [pendingGoalsCount, setPendingGoalsCount] = useState(0);
   const [leaveRequestStatus, setLeaveRequestStatus] = useState<'none' | 'pending' | 'approved'>('none');
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [upcomingShiftsCount, setUpcomingShiftsCount] = useState(0);
+  const [managerViewMode, setManagerViewMode] = useState<'team' | 'personal'>('team');
+
 
   // Fetch unread notification count
   const fetchUnreadCount = async () => {
@@ -182,6 +185,31 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     };
     
      return result;
+  };
+
+  // Check upcoming shifts count
+  const checkUpcomingShifts = async () => {
+    if (!user?.employeeId) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/workDay/shifts/employee/${user.employeeId}`);
+      if (response.ok) {
+        const shifts = await response.json();
+        const now = new Date();
+        
+        // Count upcoming shifts (not open, not completed, start time in the future)
+        const upcomingCount = shifts.filter((shift: any) => {
+          const start = new Date(shift.startTime);
+          const end = new Date(shift.endTime);
+          return !shift.isOpen && now < end;
+        }).length;
+        
+        setUpcomingShiftsCount(upcomingCount);
+      }
+    } catch (error) {
+      console.error('Error checking upcoming shifts:', error);
+      setUpcomingShiftsCount(0);
+    }
   };
 
   // Check for missed check-ins (but exclude if currently active)
@@ -404,17 +432,34 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     
     try {
       console.log('=== CHECKING PENDING APPROVALS ===');
-      console.log('Manager ID:', user.employeeId);
+      console.log('User Role:', user.role);
+      console.log('User ID:', user.employeeId);
       
       let totalPendingCount = 0;
       
       // 1. Check pending leave requests
       try {
-        const leaveResponse = await fetch(`http://localhost:5000/workDay/leaves/manager/${user.employeeId}/pending`);
-        if (leaveResponse.ok) {
-          const pendingLeaves = await leaveResponse.json();
-          console.log('Pending leave requests:', pendingLeaves.length);
-          totalPendingCount += pendingLeaves.length;
+        if (user.role === 'Admin') {
+          // For admins, fetch all leaves and filter for managers only
+          const leaveResponse = await fetch(`http://localhost:5000/workDay/leaves`);
+          if (leaveResponse.ok) {
+            const allLeaves = await leaveResponse.json();
+            const pendingManagerLeaves = allLeaves.filter((leave: any) => 
+              leave.status === 'Pending' && 
+              leave.employeeId && 
+              leave.employeeId.role === 'Manager'
+            );
+            console.log('Pending manager leave requests:', pendingManagerLeaves.length);
+            totalPendingCount += pendingManagerLeaves.length;
+          }
+        } else {
+          // For managers, use the existing endpoint
+          const leaveResponse = await fetch(`http://localhost:5000/workDay/leaves/manager/${user.employeeId}/pending`);
+          if (leaveResponse.ok) {
+            const pendingLeaves = await leaveResponse.json();
+            console.log('Pending leave requests:', pendingLeaves.length);
+            totalPendingCount += pendingLeaves.length;
+          }
         }
       } catch (error) {
         console.error('Error fetching pending leave requests:', error);
@@ -460,6 +505,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     checkPendingGoals();
     checkLeaveRequestStatus();
     checkPendingApprovals();
+    checkUpcomingShifts();
     
     // Refresh counts every 30 seconds
     const interval = setInterval(() => {
@@ -470,6 +516,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       checkPendingGoals();
       checkLeaveRequestStatus();
       checkPendingApprovals();
+      checkUpcomingShifts();
     }, 30000);
     
     // Listen for custom refresh events
@@ -500,6 +547,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     const handleRefreshApprovals = () => {
       checkPendingApprovals();
     };
+
+    const handleRefreshUpcomingShifts = () => {
+      checkUpcomingShifts();
+    };
     
     window.addEventListener('refreshNotificationBadge', handleRefreshBadge);
     window.addEventListener('refreshClockInStatus', handleRefreshClockStatus);
@@ -508,6 +559,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     window.addEventListener('refreshGoalsBadge', handleRefreshGoals);
     window.addEventListener('refreshLeaveRequestBadge', handleRefreshLeaveRequests);
     window.addEventListener('refreshApprovalsBadge', handleRefreshApprovals);
+    window.addEventListener('refreshUpcomingShiftsBadge', handleRefreshUpcomingShifts);
     
     return () => {
       clearInterval(interval);
@@ -518,6 +570,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       window.removeEventListener('refreshGoalsBadge', handleRefreshGoals);
       window.removeEventListener('refreshLeaveRequestBadge', handleRefreshLeaveRequests);
       window.removeEventListener('refreshApprovalsBadge', handleRefreshApprovals);
+      window.removeEventListener('refreshUpcomingShiftsBadge', handleRefreshUpcomingShifts);
     };
   }, [user?.employeeId, user?.managerId, user?.role]);
 
@@ -548,7 +601,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         label: 'My Shifts', 
         icon: Calendar, 
         roles: ['Employee'],
-        missedCount: missedCheckInCount
+        missedCount: missedCheckInCount,
+        upcomingCount: upcomingShiftsCount
       },
       { 
         href: '/dashboard/my-goals', 
@@ -562,7 +616,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         label: 'Leave Requests', 
         icon: FileText, 
         roles: ['Employee'], 
-        leaveStatus: leaveRequestStatus // Fixed syntax - removed extra }
+        leaveStatus: leaveRequestStatus
       },
       { 
         href: '/dashboard/attendance', 
@@ -588,21 +642,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         label: 'Approvals', 
         icon: CheckSquare, 
         roles: ['Manager', 'Admin'],
-        pendingCount: pendingApprovalsCount // Add pending approvals count
+        pendingCount: pendingApprovalsCount
       },
       { href: '/dashboard/payroll', label: 'Payroll', icon: DollarSign, roles: ['Admin'] },
       { href: '/dashboard/reports', label: 'Reports', icon: BarChart3, roles: ['Manager', 'Admin'] },
       { href: '/dashboard/shift-management', label: 'Shift Management', icon: Calendar, roles: ['Manager', 'Admin'] },
-       { href: '/dashboard/payslips', label: 'Payslips', icon: Calendar, roles: ['Manager', 'Admin'] },
     ];
 
     const adminItems = [
-      { href: '/dashboard/employees', label: 'Employee Management', icon: Users, roles: ['Admin'] },
       { href: '/dashboard/goals', label: 'Goal Management', icon: CheckSquare, roles: ['Admin', 'Manager'] },
-      { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Admin'] }, 
       { href: '/dashboard/employeees', label: 'Employee Create', icon: Users, roles: ['Admin'] },
       { href: '/dashboard/departments', label: 'Departments & Positions', icon: Building, roles: ['Admin'] },
-      { href: '/dashboard/recruitment', label: 'Recruitment', icon: Briefcase, roles: ['Manager'] },
     ];
 
     const notificationItem = [
@@ -615,8 +665,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       },
     ];
 
+    // For managers, show different menu items based on view mode
+    if (user?.role === 'Manager') {
+      if (managerViewMode === 'personal') {
+        // Show employee-level features for personal view
+        const allItems = [...baseItems, ...employeeItems, ...notificationItem];
+        return allItems;
+      } else {
+        // Show team management features
+        const allItems = [...baseItems, ...managerItems, ...adminItems, ...notificationItem];
+        return allItems.filter(item => 
+          user && item.roles.includes(user.role)
+        );
+      }
+    }
+
+    // For other roles, show normal filtered items
     const allItems = [...baseItems, ...employeeItems, ...managerItems, ...adminItems, ...notificationItem];
-    
     return allItems.filter(item => 
       user && item.roles.includes(user.role)
     );
@@ -670,23 +735,72 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
         {/* User Profile Section */}
         <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage 
-                src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`} 
-                alt={user?.name} 
-              />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white">
-                {user?.name ? getInitials(user.name) : 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user?.name}
-              </p>
-              
+          {user?.role === 'Manager' ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="w-full h-auto p-0 hover:bg-sidebar-accent">
+                  <div className="flex items-center space-x-3 w-full p-2">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage 
+                        src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`} 
+                        alt={user?.name} 
+                      />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white">
+                        {user?.name ? getInitials(user.name) : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-medium text-sidebar-foreground truncate">
+                        {user?.name}
+                      </p>
+                      <p className="text-xs text-sidebar-foreground/60">
+                        {managerViewMode === 'personal' ? 'My Profile' : 'Team Management'}
+                      </p>
+                    </div>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem 
+                  onClick={() => setManagerViewMode('personal')}
+                  className={cn(
+                    "cursor-pointer",
+                    managerViewMode === 'personal' && "bg-primary/10 text-primary"
+                  )}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  My Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setManagerViewMode('team')}
+                  className={cn(
+                    "cursor-pointer",
+                    managerViewMode === 'team' && "bg-primary/10 text-primary"
+                  )}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Team Management
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage 
+                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.name}`} 
+                  alt={user?.name} 
+                />
+                <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white">
+                  {user?.name ? getInitials(user.name) : 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user?.name}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -743,7 +857,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
                       </Badge>
                     )}
 
-                    {/* Missed Check-in badge for My Shifts */}
+                    {/* Upcoming Shifts badge for My Shifts */}
+                    {item.label === 'My Shifts' && upcomingShiftsCount > 0 && !(missedCheckInCount > 0 && !isCurrentlyClockedIn) && (
+                      <Badge 
+                        variant="secondary" 
+                        className="ml-auto text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200"
+                      >
+                        {upcomingShiftsCount > 99 ? '99+' : upcomingShiftsCount}
+                      </Badge>
+                    )}
+
+                    {/* Missed Check-in badge for My Shifts (takes priority over upcoming count) */}
                     {item.label === 'My Shifts' && missedCheckInCount > 0 && !isCurrentlyClockedIn && (
                       <Badge 
                         variant="destructive" 
@@ -844,6 +968,29 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {user?.role === 'Manager' && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setManagerViewMode('personal');
+                      setSidebarOpen(true);
+                    }}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    My Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setManagerViewMode('team');
+                      setSidebarOpen(true);
+                    }}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    Team Management
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={() => setSidebarOpen(true)}>
                 Menu
               </DropdownMenuItem>

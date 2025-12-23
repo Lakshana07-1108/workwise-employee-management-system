@@ -22,7 +22,7 @@ export const createLeaveRequest = async (data: {
 };
 
 export const getAllLeaveRequests = () => {
-  return LeaveRequest.find().populate('employeeId');
+  return LeaveRequest.find().populate('employeeId', 'firstName lastName email role');
 };
 
 // src/service/leaveRequestService.ts
@@ -35,7 +35,7 @@ export const updateLeaveStatus = async (
     leaveId,
     { status, approverNotes },
     { new: true }
-  ).populate('employeeId');
+  ).populate('employeeId', 'firstName lastName email role');
 };
 
 export const getLeaveRequestsByEmployee = async (employeeId: string) => {

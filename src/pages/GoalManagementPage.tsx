@@ -310,7 +310,7 @@ console.log(savedGoal);
                   <SelectContent>
                     {employees.map(employee => (
                       <SelectItem key={employee._id} value={employee._id}>
-                        {employee.name} - {employee.department}
+                        {employee.name} - {typeof employee.jobInfo.departmentId === 'object' ? employee.jobInfo.departmentId.name : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -284,7 +284,7 @@ export const Dashboard: React.FC = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.thisWeekHours || 0}h</div>
+            <div className="text-2xl font-bold">{(stats.thisWeekHours || 0).toFixed(1)}h</div>
             <p className="text-xs text-muted-foreground">Hours worked</p>
           </CardContent>
         </Card>

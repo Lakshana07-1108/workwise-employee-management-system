@@ -49,6 +49,7 @@ export const LeaveRequestsPage: React.FC = () => {
   const { user } = useAuth();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
   const [newRequest, setNewRequest] = useState({
     type: '',
     startDate: undefined as Date | undefined,
@@ -109,6 +110,15 @@ export const LeaveRequestsPage: React.FC = () => {
   useEffect(() => {
     fetchLeaveRequests();
   }, [user?.employeeId]);
+
+  useEffect(() => {
+    const days = calculateDays();
+    if (days > 9) {
+      setShowWarning(true);
+    } else {
+      setShowWarning(false);
+    }
+  }, [newRequest.startDate, newRequest.endDate]);
 
   const handleSubmitRequest = async () => {
     if (!newRequest.type || !newRequest.startDate || !newRequest.endDate) {
@@ -284,6 +294,7 @@ export const LeaveRequestsPage: React.FC = () => {
                                 mode="single"
                                 selected={newRequest.startDate}
                                 onSelect={(date) => setNewRequest({...newRequest, startDate: date})}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                 initialFocus
                               />
                             </PopoverContent>
@@ -309,6 +320,7 @@ export const LeaveRequestsPage: React.FC = () => {
                                 mode="single"
                                 selected={newRequest.endDate}
                                 onSelect={(date) => setNewRequest({...newRequest, endDate: date})}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                 initialFocus
                               />
                             </PopoverContent>
@@ -316,8 +328,19 @@ export const LeaveRequestsPage: React.FC = () => {
                         </div>
                       </div>
                       {newRequest.startDate && newRequest.endDate && (
-                        <div className="text-sm text-muted-foreground">
-                          Total days: {calculateDays()}
+                        <div className="space-y-2">
+                          <div className="text-sm text-muted-foreground">
+                            Total days: {calculateDays()}
+                          </div>
+                          {showWarning && (
+                            <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                              <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                              <div className="text-sm text-yellow-800">
+                                <p className="font-medium">Warning: Extended Leave Duration</p>
+                                <p className="text-xs mt-1">The selected leave duration ({calculateDays()} days) exceeds the recommended limit of 9 days. Please ensure this has been discussed with your manager.</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

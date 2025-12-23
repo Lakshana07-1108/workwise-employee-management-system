@@ -82,7 +82,7 @@ const shiftTypes = [
     name: 'Morning Shift', 
     startTime: '09:00', 
     endTime: '15:00', 
-    color: 'bg-yellow-500 text-white', 
+    colorClass: 'bg-yellow-500 text-white', 
     icon: Sun,
     displayTime: '14:30 - 22:30 IST' // Pre-calculated IST for display
   },
@@ -91,7 +91,7 @@ const shiftTypes = [
     name: 'Afternoon Shift', 
     startTime: '16:00', 
     endTime: '21:00', 
-    color: 'bg-blue-500 text-white', 
+    colorClass: 'bg-orange-500 text-white', 
     icon: Sunset,
     displayTime: '18:30 - 02:30 IST'
   },
@@ -100,7 +100,7 @@ const shiftTypes = [
     name: 'Night Shift', 
     startTime: '22:00', 
     endTime: '05:00', 
-    color: 'bg-purple-500 text-white', 
+    colorClass: 'bg-indigo-600 text-white', 
     icon: Moon,
     displayTime: '02:30 - 10:30 IST'
   },
@@ -298,9 +298,25 @@ export const ShiftManagementPage: React.FC = () => {
     );
     return shiftType || {
       name: shift.customName || 'Custom Shift',
-      color: 'bg-green-500 text-white',
+      colorClass: 'bg-green-500 text-white',
       icon: Settings2
     };
+  };
+
+  // Helper function to get explicit color classes based on shift type
+  const getShiftColorClasses = (shift: Shift): string => {
+    // Match by start and end time
+    if (shift.startTime === '09:00' && shift.endTime === '15:00') {
+      return 'bg-yellow-500 text-white'; // Morning
+    }
+    if (shift.startTime === '16:00' && shift.endTime === '21:00') {
+      return 'bg-orange-500 text-white'; // Afternoon/Evening
+    }
+    if (shift.startTime === '22:00' && shift.endTime === '05:00') {
+      return 'bg-indigo-600 text-white'; // Night
+    }
+    // Default for custom shifts
+    return 'bg-green-500 text-white';
   };
 
   
@@ -1152,34 +1168,71 @@ export const ShiftManagementPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {shiftTypes.map((shiftType) => {
-                const IconComponent = shiftType.icon;
-                return (
-                  <Card
-                    key={shiftType.type}
-                    className={cn(
-                      "cursor-grab hover:shadow-md transition-shadow border-2 border-dashed",
-                      shiftType.color
-                    )}
-                    draggable
-                    onDragStart={(e) => handleDragStart(shiftType, e)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 rounded-lg bg-white bg-opacity-20">
-                          <IconComponent className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{shiftType.name}</h4>
-                          <p className="text-sm opacity-90">
-                            {convertToIST(shiftType.startTime)} - {convertToIST(shiftType.endTime)} IST
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {/* Morning Shift */}
+              <Card
+                className="cursor-grab hover:shadow-md transition-shadow border-2 border-dashed"
+                style={{ backgroundColor: '#eab308', color: 'white' }}
+                draggable
+                onDragStart={(e) => handleDragStart(shiftTypes[0], e)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-lg bg-white bg-opacity-20">
+                      <Sun className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Morning Shift</h4>
+                      <p className="text-sm opacity-90">
+                        {convertToIST('09:00')} - {convertToIST('15:00')} IST
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Afternoon Shift */}
+              <Card
+                className="cursor-grab hover:shadow-md transition-shadow border-2 border-dashed"
+                style={{ backgroundColor: '#f97316', color: 'white' }}
+                draggable
+                onDragStart={(e) => handleDragStart(shiftTypes[1], e)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-lg bg-white bg-opacity-20">
+                      <Sunset className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Afternoon Shift</h4>
+                      <p className="text-sm opacity-90">
+                        {convertToIST('16:00')} - {convertToIST('21:00')} IST
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Night Shift */}
+              <Card
+                className="cursor-grab hover:shadow-md transition-shadow border-2 border-dashed"
+                style={{ backgroundColor: '#4f46e5', color: 'white' }}
+                draggable
+                onDragStart={(e) => handleDragStart(shiftTypes[2], e)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-lg bg-white bg-opacity-20">
+                      <Moon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Night Shift</h4>
+                      <p className="text-sm opacity-90">
+                        {convertToIST('22:00')} - {convertToIST('05:00')} IST
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
             <p className="text-sm text-gray-500 mt-4">
               💡 Drag any shift type to an employee's day slot to assign it
@@ -1286,55 +1339,168 @@ export const ShiftManagementPage: React.FC = () => {
                                 }}
                               >
                                 {shiftData ? (
-                                  <div className={cn(
-                                    "relative text-xs p-1 rounded text-center h-full flex flex-col justify-center",
-                                    shiftData.type === 'pending' 
-                                      ? "bg-orange-200 text-orange-800" 
-                                      : getShiftTypeInfo(shiftData.shift).color
-                                  )}>
-                                    {/* Show pending indicator */}
+                                  <>
+                                    {/* Pending shift - orange */}
                                     {shiftData.type === 'pending' && (
-                                      <div className="absolute top-0 right-0 w-2 h-2 bg-orange-500 rounded-full"></div>
-                                    )}
-
-                                    <div className="font-medium text-xs leading-tight">
-                                      {convertToIST(shiftData.shift.startTime)}
-                                    </div>
-                                    <div className="text-xs opacity-90 leading-tight">
-                                      {convertToIST(shiftData.shift.endTime)}
-                                    </div>
-                                    {shiftData.type === 'pending' && (
-                                      <div className="text-xs opacity-75">PENDING</div>
-                                    )}
-
-                                    {/* Edit & Delete buttons for published shifts */}
-                                    {shiftData.type === 'published' && (
-                                      <div className="absolute top-1 right-1 flex space-x-1">
-                                        <button
-                                          className="p-1 rounded hover:bg-white/30"
-                                          title="Edit Shift"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            handleEditShift(employee._id, dateString, shiftData.shift);
-                                          }}
-                                        >
-                                          <Edit2 className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                          className="p-1 rounded hover:bg-white/30"
-                                          title="Delete Shift"
-                                          onClick={async e => {
-                                            e.stopPropagation();
-                                            if (window.confirm('Delete this shift?')) {
-                                              await handleDeleteShift(shiftData.shift);
-                                            }
-                                          }}
-                                        >
-                                          <Trash2 className="w-3 h-3 text-red-600" />
-                                        </button>
+                                      <div className="relative text-xs p-1 rounded text-center h-full flex flex-col justify-center" style={{ backgroundColor: '#fed7aa', color: '#9a3412' }}>
+                                        <div className="absolute top-0 right-0 w-2 h-2 rounded-full" style={{ backgroundColor: '#f97316' }}></div>
+                                        <div className="font-medium text-xs leading-tight">
+                                          {convertToIST(shiftData.shift.startTime)}
+                                        </div>
+                                        <div className="text-xs opacity-90 leading-tight">
+                                          {convertToIST(shiftData.shift.endTime)}
+                                        </div>
+                                        <div className="text-xs opacity-75">PENDING</div>
                                       </div>
                                     )}
-                                  </div>
+
+                                    {/* Morning shift - yellow */}
+                                    {shiftData.type === 'published' && shiftData.shift.startTime === '09:00' && shiftData.shift.endTime === '15:00' && (
+                                      <div className="relative text-xs p-1 rounded text-center h-full flex flex-col justify-center" style={{ backgroundColor: '#eab308', color: 'white' }}>
+                                        <div className="font-medium text-xs leading-tight">
+                                          {convertToIST(shiftData.shift.startTime)}
+                                        </div>
+                                        <div className="text-xs opacity-90 leading-tight">
+                                          {convertToIST(shiftData.shift.endTime)}
+                                        </div>
+                                        <div className="absolute top-1 right-1 flex space-x-1">
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Edit Shift"
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              handleEditShift(employee._id, dateString, shiftData.shift);
+                                            }}
+                                          >
+                                            <Edit2 className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Delete Shift"
+                                            onClick={async e => {
+                                              e.stopPropagation();
+                                              if (window.confirm('Delete this shift?')) {
+                                                await handleDeleteShift(shiftData.shift);
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Afternoon shift - orange */}
+                                    {shiftData.type === 'published' && shiftData.shift.startTime === '16:00' && shiftData.shift.endTime === '21:00' && (
+                                      <div className="relative text-xs p-1 rounded text-center h-full flex flex-col justify-center" style={{ backgroundColor: '#f97316', color: 'white' }}>
+                                        <div className="font-medium text-xs leading-tight">
+                                          {convertToIST(shiftData.shift.startTime)}
+                                        </div>
+                                        <div className="text-xs opacity-90 leading-tight">
+                                          {convertToIST(shiftData.shift.endTime)}
+                                        </div>
+                                        <div className="absolute top-1 right-1 flex space-x-1">
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Edit Shift"
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              handleEditShift(employee._id, dateString, shiftData.shift);
+                                            }}
+                                          >
+                                            <Edit2 className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Delete Shift"
+                                            onClick={async e => {
+                                              e.stopPropagation();
+                                              if (window.confirm('Delete this shift?')) {
+                                                await handleDeleteShift(shiftData.shift);
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Night shift - indigo */}
+                                    {shiftData.type === 'published' && shiftData.shift.startTime === '22:00' && shiftData.shift.endTime === '05:00' && (
+                                      <div className="relative text-xs p-1 rounded text-center h-full flex flex-col justify-center" style={{ backgroundColor: '#4f46e5', color: 'white' }}>
+                                        <div className="font-medium text-xs leading-tight">
+                                          {convertToIST(shiftData.shift.startTime)}
+                                        </div>
+                                        <div className="text-xs opacity-90 leading-tight">
+                                          {convertToIST(shiftData.shift.endTime)}
+                                        </div>
+                                        <div className="absolute top-1 right-1 flex space-x-1">
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Edit Shift"
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              handleEditShift(employee._id, dateString, shiftData.shift);
+                                            }}
+                                          >
+                                            <Edit2 className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Delete Shift"
+                                            onClick={async e => {
+                                              e.stopPropagation();
+                                              if (window.confirm('Delete this shift?')) {
+                                                await handleDeleteShift(shiftData.shift);
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Custom/Other shifts - green */}
+                                    {shiftData.type === 'published' && 
+                                     !(shiftData.shift.startTime === '09:00' && shiftData.shift.endTime === '15:00') &&
+                                     !(shiftData.shift.startTime === '16:00' && shiftData.shift.endTime === '21:00') &&
+                                     !(shiftData.shift.startTime === '22:00' && shiftData.shift.endTime === '05:00') && (
+                                      <div className="relative text-xs p-1 rounded text-center h-full flex flex-col justify-center" style={{ backgroundColor: '#22c55e', color: 'white' }}>
+                                        <div className="font-medium text-xs leading-tight">
+                                          {convertToIST(shiftData.shift.startTime)}
+                                        </div>
+                                        <div className="text-xs opacity-90 leading-tight">
+                                          {convertToIST(shiftData.shift.endTime)}
+                                        </div>
+                                        <div className="absolute top-1 right-1 flex space-x-1">
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Edit Shift"
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              handleEditShift(employee._id, dateString, shiftData.shift);
+                                            }}
+                                          >
+                                            <Edit2 className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-white/30"
+                                            title="Delete Shift"
+                                            onClick={async e => {
+                                              e.stopPropagation();
+                                              if (window.confirm('Delete this shift?')) {
+                                                await handleDeleteShift(shiftData.shift);
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="w-3 h-3 text-red-600" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
                                 ) : (
                                   <div className="flex items-center justify-center h-full text-gray-400 hover:text-gray-600">
                                     <Plus className="h-3 w-3" />
